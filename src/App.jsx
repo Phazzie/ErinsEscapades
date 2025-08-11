@@ -55,26 +55,38 @@ export default function App() {
 
   const handleRenameVibe = (oldName) => {
     const newName = prompt(`Rename the vibe "${oldName}":`);
-    if (newName && newName.trim() !== '' && oldName !== newName) {
-      const newVibeKey = newName.trim().toLowerCase().replace(/\s+/g, '_');
-      setSessionData(prev => {
-        const newVibes = { ...prev.vibes };
-        newVibes[newVibeKey] = newVibes[oldName];
-        delete newVibes[oldName];
-        return { ...prev, vibes: newVibes, currentVibe: newVibeKey };
-      });
-    }
+    if (!newName) return;
+    const trimmed = newName.trim();
+    if (trimmed === '' || trimmed === oldName) return;
+    const newVibeKey = trimmed.toLowerCase().replace(/\s+/g, '_');
+    setSessionData(prev => {
+      if (prev.vibes[newVibeKey] && newVibeKey !== oldName) {
+        alert('A vibe with that name already exists. Choose another name.');
+        return prev; // no change
+      }
+      const newVibes = { ...prev.vibes };
+      newVibes[newVibeKey] = newVibes[oldName];
+      if (newVibeKey !== oldName) delete newVibes[oldName];
+      return { ...prev, vibes: newVibes, currentVibe: newVibeKey };
+    });
   };
 
   const handleDeleteVibe = (vibeName) => {
-    if (window.confirm(`Are you sure you want to delete the "${vibeName}" vibe?`)) {
-      setSessionData(prev => {
-        const newVibes = { ...prev.vibes };
-        delete newVibes[vibeName];
-        const newCurrentVibe = vibeName === prev.currentVibe ? Object.keys(newVibes)[0] || 'default' : prev.currentVibe;
-        return { ...prev, vibes: newVibes, currentVibe: newCurrentVibe };
-      });
-    }
+    if (!window.confirm(`Delete the "${vibeName}" vibe?`)) return;
+    setSessionData(prev => {
+      const keys = Object.keys(prev.vibes);
+      if (keys.length === 1) {
+        alert('You must keep at least one vibe.');
+        return prev;
+      }
+      const newVibes = { ...prev.vibes };
+      delete newVibes[vibeName];
+      let newCurrentVibe = prev.currentVibe;
+      if (vibeName === prev.currentVibe) {
+        newCurrentVibe = Object.keys(newVibes)[0];
+      }
+      return { ...prev, vibes: newVibes, currentVibe: newCurrentVibe };
+    });
   };
 
   const updateCurrentTasks = (newTasks) => {
@@ -120,7 +132,7 @@ export default function App() {
 
   return (
     <div className="bg-gray-900 text-white min-h-screen p-4 sm:p-8 font-sans flex flex-col items-center antialiased">
-      <style>{`@keyframes rainbow-glow {0%, 100% { text-shadow: 0 0 15px #ff69b4, 0 0 25px #ff69b4;}25% { text-shadow: 0 0 15px #00ffff, 0 0 25px #00ffff;}50% { text-shadow: 0 0 15px #7fff00, 0 0 25px #7fff00;}75% { text-shadow: 0 0 15px #f0e68c, 0 0 25px #f0e68c;}}.animated-title { animation: rainbow-glow 6s ease-in-out infinite; }.text-glow-accent { text-shadow: 0 0 8px rgba(255, 105, 180, 0.7), 0 0 20px rgba(255, 105, 180, 0.5); }.button-glow-blue { box-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 20px rgba(59, 130, 246, 0.4); }.button-glow-green { box-shadow: 0 0 10px rgba(34, 197, 94, 0.6), 0 0 20px rgba(34, 197, 94, 0.4); }.form-radio:checked { background-color: #ff69b4; border-color: #ff85c1; box-shadow: 0 0 8px rgba(255, 105, 180, 0.7); }`}</style>
+  {/* styles moved to CSS file */}
       <div className="w-full max-w-4xl">
         <div className="text-center mb-4 relative">
           <AuthControls user={user} onSignIn={handleSignIn} onSignOut={handleSignOut} />
