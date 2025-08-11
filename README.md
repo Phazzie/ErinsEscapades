@@ -61,7 +61,7 @@ All Firebase config values must be prefixed with `VITE_` for exposure to the cli
 6. Deploy (build + hosting + rules): `npm run deploy:firebase`
 7. To deploy only hosting later (if rules unchanged): `firebase deploy --only hosting`
 
-Firestore rules now restrict writes to the authenticated owner of a session (see `firestore.rules`). Anyone with the link can still read.
+Collaboration model: Any authenticated user with the session link can edit tasks (owner field is immutable; only owner can delete the session). See `firestore.rules`.
 
 ## Original Monolith
 Preserved at `monolith/RAW_MONOLITH.txt` for reference during incremental feature parity verification.

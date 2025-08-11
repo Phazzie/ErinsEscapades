@@ -59,8 +59,8 @@ export function useSession(sessionId, user) {
 
   useEffect(() => {
   if (isInitial.current || !sessionId || !sessionData) return;
-  // Only the owner (authenticated) may write.
-  if (!user || !sessionData.owner || user.uid !== sessionData.owner) return;
+  // Any authenticated user may write (rules enforce owner immutability & delete restriction).
+  if (!user) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       const docRef = doc(db, 'sessions', sessionId);

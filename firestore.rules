@@ -8,8 +8,12 @@ service cloud.firestore {
       // Create allowed only by authenticated user creating their own session doc.
       allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
 
-      // Updates & deletes only by the recorded owner.
-      allow update, delete: if request.auth != null && resource.data.owner == request.auth.uid;
+  // Updates allowed by any authenticated user, but owner field must not change.
+  allow update: if request.auth != null
+        && request.resource.data.owner == resource.data.owner;
+
+  // Deletes restricted to owner.
+  allow delete: if request.auth != null && resource.data.owner == request.auth.uid;
     }
   }
 }
