@@ -1,0 +1,409 @@
+================= MONOLITH SOURCE PLACEHOLDER =================
+Paste your giant single-file app content below, replacing everything from the next line down.
+
+Guidelines:
+1. Keep original line breaks and indentation.
+2. If the file is small enough, paste it ALL at once and save.
+3. If it's too large for a single paste in the editor/chat workflow, you can still paste it here in chunks BUT mark boundaries clearly.
+4. DO NOT include real secrets (API keys, passwords). Replace with PLACEHOLDER_* tokens.
+5. Preserve any existing section / region markers you already added (e.g., // SECTION: Auth, ### MODELS ###, <!-- COMPONENT: Header -->, etc.).
+
+Chunking Format (only if needed):
+===BEGIN CHUNK 1/5===
+...original code lines...
+===END CHUNK 1/5===
+===BEGIN CHUNK 2/5===
+...original code lines...
+===END CHUNK 2/5===
+(continue until last)
+
+After you finish pasting:
+- Let me know here in chat: say "monolith pasted" (and if chunked, confirm total chunks) so I can parse and propose a refactor plan.
+- If you know the language/framework/runtime (e.g., Python 3.11 + FastAPI, Node 18 + Express, React SPA, etc.), mention it so I can scaffold correctly.
+
+Optional Quick Metadata (paste in chat, not necessarily here):
+Language:
+Primary Framework:
+Runtime Target (browser / Node / serverless / container):
+External Services (DBs/APIs):
+Deployment Goal (Vercel, Docker, Cloud Run, etc.):
+Test Preference (pytest, jest, vitest, etc.):
+
+Refactor Roadmap (what I'll do next once you paste):
+1. Parse and map sections → proposed directory & file structure.
+2. Create project scaffold (dependencies manifest, src/ folders, env handling, scripts).
+3. Incrementally extract logical modules (models, services, routes, UI components, utilities, config).
+4. Introduce minimal tests + lint/format baseline.
+5. Provide deployment instructions / containerization if desired.
+
+Edge Cases to Keep in Mind When Pasting:
+- Extremely long lines (minify-style) – leave as-is; I'll suggest splitting later.
+- Inline base64 or large JSON blobs – consider marking with a single comment placeholder if enormous.
+- Embedded binary data – DON’T paste; store separately later.
+
+Marker Lines Below — start your paste immediately after this line:
+================= BEGIN ORIGINAL MONOLITH =================
+
+import React, { useState, useEffect, useRef } from 'react';
+// IMPORTANT: You must install firebase for this to work: npm install firebase
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+
+
+// ====================================================================================
+// --- FIREBASE & INITIAL DATA CONFIGURATION ---
+// ====================================================================================
+
+// This object contains the credentials for your Firebase project.
+const firebaseConfig = {
+  apiKey: "AIzaSyAiVgqlmh2qf83YlgCEpUVEkEjHCeMt2Yk",
+  authDomain: "erinsescapades-2590c.firebaseapp.com",
+  projectId: "erinsescapades-2590c",
+  storageBucket: "erinsescapades-2590c.appspot.com",
+  messagingSenderId: "508791488316",
+  appId: "1:508791488316:web:3cce00ba55a35997c56839",
+  measurementId: "G-F2FS03E1DZ"
+};
+
+// Initialize Firebase and its services.
+// The try/catch block prevents re-initialization errors during hot-reloading in development.
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  console.error("Firebase initialization error:", e);
+}
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider(); // Google as the authentication provider.
+
+// This object holds the default lists for first-time users or new sessions.
+const initialTaskLists = {
+  'default': [
+    { id: 1, text: 'Come Over', choice: null },
+    { id: 2, text: 'Get Offensively High', choice: null },
+    { id: 3, text: 'Solidify Permanent Spot on the Cereal List', choice: null },
+  ]
+};
+
+
+// ====================================================================================
+// --- MAIN APP COMPONENT ---
+// ====================================================================================
+
+const App = () => {
+  // ------------------------------------------------------------------------------------
+  // --- STATE MANAGEMENT ---
+  // ------------------------------------------------------------------------------------
+  const [user, setUser] = useState(null); // Holds the authenticated user object from Firebase.
+  const [sessionId, setSessionId] = useState(''); // The unique ID for the shared session, derived from the URL.
+  const [sessionData, setSessionData] = useState(null); // This is the single source of truth, holding the entire session document from Firestore.
+  const [currentVibe, setCurrentVibe] = useState('default'); // The key for the currently selected list/vibe.
+  const [activeDay, setActiveDay] = useState('today'); // The state for the 'Today'/'Tomorrow' toggle.
+  const [comments, setComments] = useState(''); // The content of the comments text area.
+  const [mailtoLink, setMailtoLink] = useState(''); // The generated email link for the 'Submit' button.
+  const [isLoading, setIsLoading] = useState(true); // Controls the initial loading screen visibility.
+  const [shareableLink, setShareableLink] = useState(''); // The full URL for sharing the session.
+  const [aiTheme, setAiTheme] = useState(''); // The user's input for the AI theme generation.
+  const [isGenerating, setIsGenerating] = useState(false); // Tracks if the AI is currently generating a list to disable the button.
+  const dragItem = useRef(); // A ref to store the index of the task being dragged.
+  const dragOverItem = useRef(); // A ref to store the index of the task being dragged over.
+
+  // This ref is a flag to prevent writing to Firestore on the initial data load, which would overwrite existing data.
+  const isInitialFirestoreLoad = useRef(true);
+
+  // ------------------------------------------------------------------------------------
+  // --- SESSION AND DATA SYNCING (useEffect Hooks) ---
+  // ------------------------------------------------------------------------------------
+
+  // EFFECT 1: Manages user authentication state.
+  // This listener fires when the component mounts and whenever the user's sign-in state changes.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser); // Set user to the Firebase user object if signed in, or null if not.
+    });
+    return () => unsubscribe(); // Cleanup the listener when the component unmounts.
+  }, []);
+
+  // EFFECT 2: Manages the session ID and the shareable link.
+  // It runs once on component mount to check the URL for an existing session ID or create a new one.
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    let id = urlParams.get('session');
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 9); // Generate a new random ID if none exists.
+    }
+    setSessionId(id);
+    const newUrl = `${window.location.origin}${window.location.pathname}?session=${id}`;
+    setShareableLink(newUrl);
+  }, []); // Empty dependency array means this runs only once.
+
+  // EFFECT 3: Subscribes to real-time Firestore updates for the current session.
+  // This is the core of the real-time collaboration feature.
+  useEffect(() => {
+    if (!sessionId) return; // Don't run if we don't have a session ID yet.
+    const docRef = doc(db, 'sessions', sessionId);
+
+    // onSnapshot creates a listener that gets called immediately and every time the document changes.
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        // If the document exists in Firestore, load its data into state.
+        const data = docSnap.data();
+        setSessionData(data);
+        setCurrentVibe(data.currentVibe);
+      } else {
+        // If it's a new session, initialize it with a default structure.
+        const initialData = {
+          owner: user ? user.uid : 'anonymous', // Assign owner if user is already logged in.
+          vibes: initialTaskLists,
+          currentVibe: 'default',
+        };
+        setSessionData(initialData);
+      }
+      setIsLoading(false); // Hide the loading screen.
+      isInitialFirestoreLoad.current = false; // Mark initial load as complete.
+    });
+    return () => unsubscribe(); // Cleanup: Unsubscribe from updates when the component unmounts.
+  }, [sessionId, user]); // Re-run if user logs in to assign ownership on creation.
+
+  // EFFECT 4: Saves local state changes back to Firestore.
+  // This runs whenever `sessionData` is modified by the user.
+  useEffect(() => {
+    // Prevent writing to Firestore during the initial load to avoid overwriting data.
+    if (isInitialFirestoreLoad.current || !sessionId || !sessionData) return;
+    const docRef = doc(db, 'sessions', sessionId);
+    // `setDoc` overwrites the document with the new state.
+    setDoc(docRef, sessionData)
+      .catch(error => console.error("Error writing to Firestore:", error));
+  }, [sessionData, sessionId]); // Dependency: This runs when sessionData changes.
+  
+  // EFFECT 5: Generates the mailto link whenever data relevant to the email body changes.
+  useEffect(() => {
+      if (!sessionData) return;
+      const tasks = sessionData.vibes[currentVibe] || [];
+      const taskResults = tasks.map(task => `  - ${task.text}: ${task.choice ? task.choice.toUpperCase() : 'Not Answered'}`).join('\n');
+      const subject = `Erin's Escapades: Response for ${activeDay.charAt(0).toUpperCase() + activeDay.slice(1)}`;
+      const body = `Hi!\n\nHere are the results for the "${activeDay}" plan:\n\n${taskResults}\n\n--- Comments or Clarifying Questions ---\n${comments}\n\n`;
+      const link = `mailto:fxomov@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      setMailtoLink(link);
+  }, [sessionData, currentVibe, comments, activeDay]); // Re-generate if these change.
+
+  // ------------------------------------------------------------------------------------
+  // --- EVENT HANDLERS & HELPERS ---
+  // ------------------------------------------------------------------------------------
+  
+  // Helper to check if the current user owns the session, enabling management features.
+  const isOwner = user && sessionData && user.uid === sessionData.owner;
+
+  // Authentication Handlers
+  const handleSignIn = () => signInWithPopup(auth, provider).catch(console.error);
+  const handleSignOut = () => signOut(auth).catch(console.error);
+  
+  // Vibe Management Handlers
+  const handleListChange = (vibeName) => setCurrentVibe(vibeName);
+  
+  const handleRenameVibe = (oldName) => {
+    const newName = prompt(`Rename the vibe "${oldName}":`);
+    if (newName && newName.trim() !== "" && oldName !== newName) {
+        const newVibeKey = newName.trim().toLowerCase().replace(/\s+/g, '_');
+        setSessionData(prev => {
+            const newVibes = {...prev.vibes};
+            newVibes[newVibeKey] = newVibes[oldName]; // Copy data to new key.
+            delete newVibes[oldName]; // Delete old key.
+            return {...prev, vibes: newVibes, currentVibe: newVibeKey};
+        });
+    }
+  };
+
+  const handleDeleteVibe = (vibeName) => {
+    if (window.confirm(`Are you sure you want to delete the "${vibeName}" vibe?`)) {
+        setSessionData(prev => {
+            const newVibes = {...prev.vibes};
+            delete newVibes[vibeName];
+            // If deleting the current vibe, switch to another one to avoid a blank screen.
+            const newCurrentVibe = vibeName === prev.currentVibe ? Object.keys(newVibes)[0] || 'default' : prev.currentVibe;
+            return {...prev, vibes: newVibes, currentVibe: newCurrentVibe};
+        });
+    }
+  };
+
+  // Task Management Handlers
+  const getNewId = () => new Date().getTime(); // Helper to generate a unique ID.
+
+  // Centralized function to update the tasks for the current vibe.
+  const updateCurrentTasks = (newTasks) => {
+    setSessionData(prev => ({...prev, vibes: {...prev.vibes, [currentVibe]: newTasks}}));
+  };
+
+  const handleTaskTextChange = (id, value) => {
+    const newTasks = (sessionData.vibes[currentVibe] || []).map(t => t.id === id ? { ...t, text: value } : t);
+    updateCurrentTasks(newTasks);
+  };
+  
+  const handleChoiceChange = (id, choice) => {
+    const newTasks = (sessionData.vibes[currentVibe] || []).map(t => t.id === id ? { ...t, choice: choice } : t);
+    updateCurrentTasks(newTasks);
+  };
+
+  const handleAddTask = () => {
+    const newTasks = [...(sessionData.vibes[currentVibe] || []), { id: getNewId(), text: 'New task...', choice: null }];
+    updateCurrentTasks(newTasks);
+  };
+
+  const handleRemoveTask = (id) => {
+    const newTasks = (sessionData.vibes[currentVibe] || []).filter(t => t.id !== id);
+    updateCurrentTasks(newTasks);
+  };
+
+  // Drag and Drop Handlers
+  const handleDragEnd = () => {
+    const tasksCopy = [...(sessionData.vibes[currentVibe] || [])];
+    const draggedItemContent = tasksCopy.splice(dragItem.current, 1)[0];
+    tasksCopy.splice(dragOverItem.current, 0, draggedItemContent);
+    dragItem.current = null;
+    dragOverItem.current = null;
+    updateCurrentTasks(tasksCopy);
+  };
+
+  // ------------------------------------------------------------------------------------
+  // --- AI VIBE GENERATION ---
+  // ------------------------------------------------------------------------------------
+  const handleGenerateVibe = async () => { /* ... AI generation logic remains the same ... */ };
+
+  // ------------------------------------------------------------------------------------
+  // --- RENDER LOGIC ---
+  // ------------------------------------------------------------------------------------
+  // Derive the tasks to be rendered from the master `sessionData` state.
+  // This ensures the UI is always in sync with the single source of truth.
+  const tasks = sessionData ? (sessionData.vibes[currentVibe] || []) : [];
+
+  // Display a loading message until the initial data is fetched from Firestore.
+  if (isLoading) {
+    return <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center"><h1 className="text-4xl text-cyan-400">Loading Session...</h1></div>;
+  }
+
+  // The main JSX for the application UI.
+  return (
+    <div className="bg-gray-900 text-white min-h-screen p-4 sm:p-8 font-sans flex flex-col items-center antialiased">
+       <style>{`
+        @keyframes rainbow-glow {
+          0%, 100% { text-shadow: 0 0 15px #ff69b4, 0 0 25px #ff69b4; }
+          25% { text-shadow: 0 0 15px #00ffff, 0 0 25px #00ffff; }
+          50% { text-shadow: 0 0 15px #7fff00, 0 0 25px #7fff00; }
+          75% { text-shadow: 0 0 15px #f0e68c, 0 0 25px #f0e68c; }
+        }
+        .animated-title { animation: rainbow-glow 6s ease-in-out infinite; }
+        .text-glow-accent { text-shadow: 0 0 8px rgba(255, 105, 180, 0.7), 0 0 20px rgba(255, 105, 180, 0.5); }
+        .button-glow-blue { box-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 20px rgba(59, 130, 246, 0.4); }
+        .button-glow-green { box-shadow: 0 0 10px rgba(34, 197, 94, 0.6), 0 0 20px rgba(34, 197, 94, 0.4); }
+        .form-radio:checked { background-color: #ff69b4; border-color: #ff85c1; box-shadow: 0 0 8px rgba(255, 105, 180, 0.7); }
+      `}</style>
+      <div className="w-full max-w-4xl">
+        {/* Header Section */}
+        <div className="text-center mb-4 relative">
+            <div className="absolute top-0 right-0">
+                {user ? (
+                    <div className="flex items-center gap-3">
+                        <img src={user.photoURL} alt={user.displayName} className="w-10 h-10 rounded-full border-2 border-cyan-400"/>
+                        <button onClick={handleSignOut} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sign Out</button>
+                    </div>
+                ) : (
+                    <button onClick={handleSignIn} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Sign In with Google</button>
+                )}
+            </div>
+          <h1 className="animated-title text-6xl sm:text-7xl font-bold mb-4 text-white tracking-wide">Erin's Escapades</h1>
+          <p className="text-gray-400 text-lg italic">Schemes, Dreams, and Questionable Decisions.</p>
+        </div>
+        
+        {/* Share Link Area */}
+        <div className="mb-4 p-3 bg-gray-800 rounded-lg text-center">
+            <label className="font-bold text-cyan-400">Share this link:</label>
+            <input type="text" readOnly value={shareableLink} className="w-full bg-gray-900 text-white p-2 mt-2 rounded-md text-center"/>
+        </div>
+
+        {/* Day Toggle */}
+        <div className="flex justify-center mb-8">
+            <div className="relative bg-gray-800 rounded-full p-1 w-72 mx-auto flex items-center shadow-lg">
+                <button onClick={() => setActiveDay('today')} className={`w-1/2 rounded-full p-2 text-lg font-semibold transition-all duration-300 z-10 ${activeDay === 'today' ? 'text-gray-900' : 'text-gray-400 hover:bg-gray-700'}`}>Today</button>
+                <button onClick={() => setActiveDay('tomorrow')} className={`w-1/2 rounded-full p-2 text-lg font-semibold transition-all duration-300 z-10 ${activeDay === 'tomorrow' ? 'text-gray-900' : 'text-gray-400 hover:bg-gray-700'}`}>Tomorrow</button>
+                <div className={`absolute top-1 h-10 bg-cyan-400 rounded-full transition-all duration-500 ease-in-out ${activeDay === 'today' ? 'transform translate-x-0' : 'transform translate-x-full'}`} style={{width: 'calc(50% - 4px)', margin: '0 2px', boxShadow: '0 0 15px rgba(6, 182, 212, 0.8)'}}></div>
+            </div>
+        </div>
+
+        {/* AI Generation Section (Only for session owner) */}
+        {isOwner && (
+            <div className="mb-8 p-4 bg-gray-800/80 rounded-xl shadow-lg border border-purple-500/30">
+                <h2 className="text-center text-xl font-semibold mb-3 text-purple-400">Generate a New Vibe with AI</h2>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <input type="text" value={aiTheme} onChange={(e) => setAiTheme(e.target.value)} placeholder="Enter a theme (e.g., spicy, chill, romantic)" className="flex-grow bg-gray-900/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"/>
+                    <button onClick={handleGenerateVibe} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed">{isGenerating ? 'Generating...' : 'Generate'}</button>
+                </div>
+            </div>
+        )}
+
+        {/* Vibe Selection Section */}
+        <div className="mb-8 p-4 bg-gray-800/80 rounded-xl shadow-lg border border-cyan-500/20">
+            <h2 className="text-center text-xl font-semibold mb-3 text-cyan-400">Change the Vibe</h2>
+            <div className="flex justify-center flex-wrap gap-3">
+                {sessionData && Object.keys(sessionData.vibes).map(vibeName => (
+                    <div key={vibeName} className="flex items-center group">
+                        <button onClick={() => handleListChange(vibeName)} className={`font-bold py-2 px-4 rounded-l-lg transition-transform transform hover:scale-105 ${currentVibe === vibeName ? 'bg-cyan-500 text-white' : 'bg-gray-600 hover:bg-gray-500 text-white'}`}>{vibeName.charAt(0).toUpperCase() + vibeName.slice(1).replace(/([A-Z])|_/g, ' $1').trim()}</button>
+                        {isOwner && (
+                            <div className="flex">
+                                <button onClick={() => handleRenameVibe(vibeName)} className="bg-gray-500 hover:bg-yellow-500 p-2 transition-colors opacity-50 group-hover:opacity-100">✏️</button>
+                                <button onClick={() => handleDeleteVibe(vibeName)} className="bg-gray-500 hover:bg-red-500 p-2 rounded-r-lg transition-colors opacity-50 group-hover:opacity-100">🗑️</button>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* Main Checklist Table */}
+        <div className="bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-2xl overflow-hidden border border-pink-500/20">
+          <div className="grid grid-cols-10 gap-2 p-4 bg-gray-700/50 font-bold text-lg text-pink-400 text-left">
+            <div className="col-span-5">Task</div>
+            <div className="col-span-1 text-center">Yes</div>
+            <div className="col-span-1 text-center">No</div>
+            <div className="col-span-1 text-center">Maybe</div>
+            <div className="col-span-2 text-center">Actions</div>
+          </div>
+          {tasks.map((task, index) => (
+            <div key={task.id} draggable onDragStart={() => dragItem.current = index} onDragEnter={() => dragOverItem.current = index} onDragEnd={handleDragEnd} onDragOver={(e) => e.preventDefault()} className="grid grid-cols-10 gap-2 border-t border-pink-500/20 items-center p-2 hover:bg-pink-500/10 transition-colors duration-300 cursor-grab">
+              <div className="col-span-5">
+                <input type="text" value={task.text} onChange={(e) => handleTaskTextChange(task.id, e.target.value)} className="bg-transparent w-full p-3 text-white placeholder-gray-500 focus:outline-none focus:bg-gray-900/50 rounded-md transition-all"/>
+              </div>
+              {['yes', 'no', 'maybe'].map(choice => (
+                <div key={choice} className="col-span-1 text-center">
+                  <input type="radio" name={`choice-${task.id}`} checked={task.choice === choice} onChange={() => handleChoiceChange(task.id, choice)} className="form-radio h-6 w-6 text-pink-400 bg-gray-900 border-gray-600 focus:ring-pink-400 focus:ring-offset-gray-800 transition-all duration-300"/>
+                </div>
+              ))}
+              <div className="col-span-2 text-center">
+                <button onClick={() => handleRemoveTask(task.id)} className="text-red-500 hover:text-red-400 font-bold py-2 px-4 rounded transition-colors hover:bg-red-500/10">Remove</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Footer Section */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl shadow-2xl border border-pink-500/20">
+                <h2 className="text-xl font-semibold mb-3 text-pink-400 text-glow-accent">Comments or Clarifying Questions</h2>
+                <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Add any additional notes here..." className="w-full h-32 p-3 bg-gray-900/50 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 border border-transparent focus:border-pink-500 transition-all"></textarea>
+            </div>
+            <div className="bg-gray-800/80 backdrop-blur-sm p-4 rounded-xl shadow-2xl border border-cyan-500/20 flex flex-col justify-around items-center">
+                <button onClick={handleAddTask} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 mb-4 button-glow-blue">Add Task</button>
+                <a href={mailtoLink} className="w-full text-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 transform hover:scale-105 button-glow-green">Submit</a>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+
+
+================= END (leave this line in place; I'll truncate after your real content) =================
