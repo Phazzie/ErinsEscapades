@@ -61,6 +61,28 @@ All Firebase config values must be prefixed with `VITE_` for exposure to the cli
 6. Deploy (build + hosting + rules): `npm run deploy:firebase`
 7. To deploy only hosting later (if rules unchanged): `firebase deploy --only hosting`
 
+### Headless / Token Deployment
+If interactive `firebase login` fails in this container:
+1. On your local machine run: `firebase login:ci` and copy the printed token.
+2. Back here, export it for this shell:
+```
+export FIREBASE_TOKEN=YOUR_TOKEN_VALUE
+```
+3. One-off deploy:
+```
+FIREBASE_TOKEN=$FIREBASE_TOKEN npm run deploy:firebase
+```
+Or use the helper script:
+```
+chmod +x scripts/deploy-with-token.sh
+./scripts/deploy-with-token.sh
+```
+Add to shell startup (optional):
+```
+echo 'export FIREBASE_TOKEN=YOUR_TOKEN_VALUE' >> ~/.bashrc
+```
+Never commit the token.
+
 Collaboration model: Any authenticated user with the session link can edit tasks (owner field is immutable; only owner can delete the session). See `firestore.rules`.
 
 ## Original Monolith
