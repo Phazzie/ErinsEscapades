@@ -61,7 +61,7 @@ All Firebase config values must be prefixed with `VITE_` for exposure to the cli
 6. Deploy (build + hosting + rules): `npm run deploy:firebase`
 7. To deploy only hosting later (if rules unchanged): `firebase deploy --only hosting`
 
-Firestore rules are currently OPEN for rapid collaboration (see `firestore.rules`). Tighten before production.
+Firestore rules now restrict writes to the authenticated owner of a session (see `firestore.rules`). Anyone with the link can still read.
 
 ## Original Monolith
 Preserved at `monolith/RAW_MONOLITH.txt` for reference during incremental feature parity verification.

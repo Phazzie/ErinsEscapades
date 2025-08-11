@@ -1,7 +1,7 @@
 // Session service abstraction: creation & timestamp updates
 export function prepareInitialSession(userId) {
   return {
-    owner: userId || 'anonymous',
+    owner: userId, // must be authenticated uid for secure rules
     vibes: {
       default: [
         { id: 1, text: 'Come Over', choice: null },

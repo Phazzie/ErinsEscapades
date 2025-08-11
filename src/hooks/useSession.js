@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { prepareInitialSession, touchSession } from '../lib/sessionService';
 
 const initialTaskLists = null; // now provided by prepareInitialSession
@@ -17,23 +17,50 @@ export function useSession(sessionId, user) {
   useEffect(() => {
     if (!sessionId) return;
     const docRef = doc(db, 'sessions', sessionId);
-    const unsub = onSnapshot(docRef, snap => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setSessionData(data);
-        setCurrentVibe(data.currentVibe);
-      } else {
-        const initialData = prepareInitialSession(user ? user.uid : 'anonymous');
-        setSessionData(initialData);
+    let unsub;
+    (async () => {
+      try {
+        const existing = await getDoc(docRef);
+        if (existing.exists()) {
+          const data = existing.data();
+          setSessionData(data);
+          setCurrentVibe(data.currentVibe);
+          unsub = onSnapshot(docRef, snap => {
+            if (snap.exists()) {
+              const data2 = snap.data();
+              setSessionData(data2);
+              setCurrentVibe(data2.currentVibe);
+            }
+          });
+        } else if (user) {
+          const initialData = prepareInitialSession(user.uid);
+            await setDoc(docRef, initialData); // persist with owner immediately
+            setSessionData(initialData);
+            setCurrentVibe(initialData.currentVibe);
+            unsub = onSnapshot(docRef, snap => {
+              if (snap.exists()) {
+                const data3 = snap.data();
+                setSessionData(data3);
+                setCurrentVibe(data3.currentVibe);
+              }
+            });
+        } else {
+          // Not authenticated and no existing session: wait until user logs in.
+        }
+      } catch (e) {
+        console.error('Session init error', e);
+      } finally {
+        setIsLoading(false);
+        isInitial.current = false;
       }
-      setIsLoading(false);
-      isInitial.current = false;
-    });
-    return () => unsub();
+    })();
+    return () => { if (unsub) unsub(); };
   }, [sessionId, user]);
 
   useEffect(() => {
-    if (isInitial.current || !sessionId || !sessionData) return;
+  if (isInitial.current || !sessionId || !sessionData) return;
+  // Only the owner (authenticated) may write.
+  if (!user || !sessionData.owner || user.uid !== sessionData.owner) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       const docRef = doc(db, 'sessions', sessionId);

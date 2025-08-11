@@ -1,9 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // MVP: open collaboration on sessions collection.
     match /sessions/{sessionId} {
-      allow read, write: if true; // WARNING: Open access for rapid MVP. Tighten before production.
+      // Anyone with the link can read a session.
+      allow read: if true;
+
+      // Create allowed only by authenticated user creating their own session doc.
+      allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
+
+      // Updates & deletes only by the recorded owner.
+      allow update, delete: if request.auth != null && resource.data.owner == request.auth.uid;
     }
   }
 }
