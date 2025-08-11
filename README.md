@@ -47,6 +47,20 @@ All Firebase config values must be prefixed with `VITE_` for exposure to the cli
 - `npm run dev` – start dev server
 - `npm run build` – production build
 - `npm run preview` – preview production build locally
+ - `npm run deploy:firebase` – build then deploy hosting + Firestore rules
+
+## Deploying to Firebase Hosting
+1. Install the Firebase CLI (if not already): `npm i -g firebase-tools`
+2. Login: `firebase login`
+3. (First time) Initialize hosting (select existing project or create new): `firebase init hosting`
+  - Public directory: `dist`
+  - SPA rewrite: Yes
+  - Don’t overwrite existing config unless you intend to
+4. Ensure `.env` contains your `VITE_FIREBASE_*` values.
+5. Deploy (build + hosting + rules): `npm run deploy:firebase`
+6. To deploy only hosting later (if rules unchanged): `firebase deploy --only hosting`
+
+Firestore rules are currently OPEN for rapid collaboration (see `firestore.rules`). Tighten before production.
 
 ## Original Monolith
 Preserved at `monolith/RAW_MONOLITH.txt` for reference during incremental feature parity verification.
