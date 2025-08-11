@@ -52,13 +52,14 @@ All Firebase config values must be prefixed with `VITE_` for exposure to the cli
 ## Deploying to Firebase Hosting
 1. Install the Firebase CLI (if not already): `npm i -g firebase-tools`
 2. Login: `firebase login`
-3. (First time) Initialize hosting (select existing project or create new): `firebase init hosting`
+3. (Only if you haven't already set up): `firebase login`
+4. We already include `firebase.json` with SPA rewrite + Firestore rules mapping and `.firebaserc` now points at your project id (`erinsescapades-2590c`). If you run `firebase init hosting`, choose NO when asked to overwrite existing config.
   - Public directory: `dist`
-  - SPA rewrite: Yes
-  - Don’t overwrite existing config unless you intend to
-4. Ensure `.env` contains your `VITE_FIREBASE_*` values.
-5. Deploy (build + hosting + rules): `npm run deploy:firebase`
-6. To deploy only hosting later (if rules unchanged): `firebase deploy --only hosting`
+  - Configure as SPA (rewrite all to /index.html): Yes
+  - Skip if config already present
+5. Ensure `.env` contains your `VITE_FIREBASE_*` values.
+6. Deploy (build + hosting + rules): `npm run deploy:firebase`
+7. To deploy only hosting later (if rules unchanged): `firebase deploy --only hosting`
 
 Firestore rules are currently OPEN for rapid collaboration (see `firestore.rules`). Tighten before production.
 
